@@ -11,6 +11,6 @@ export class AppController {
   }
   @Get('/health')
   getHealth() {
-    throw new Error('break-health-for-rollback-test');
+    return { status: 'ok' };
   }
 }
