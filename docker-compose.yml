@@ -1,0 +1,68 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: app_password
+      POSTGRES_DB: app_db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d app_db"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - app_net
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - app_net
+
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      APP_ENV: prod
+
+      # ✅ match Postgres service name "postgres"
+      DATABASE_URL: postgresql://app:app_password@postgres:5432/app_db?schema=public
+
+      # ✅ match RedisService reading REDIS_URL
+      REDIS_URL: redis://redis:6379
+
+      JWT_ACCESS_SECRET: dev_access_secret_change_me
+      JWT_REFRESH_SECRET: dev_refresh_secret_change_me
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+
+    ports:
+      - "3000:3000"
+    networks:
+      - app_net
+    restart: unless-stopped
+
+networks:
+  app_net:
+
+volumes:
+  pgdata:
+  redisdata:
