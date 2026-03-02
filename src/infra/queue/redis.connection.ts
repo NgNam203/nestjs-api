@@ -1,9 +1,22 @@
 import { RedisOptions } from 'ioredis';
 
-export const bullRedisConnection: RedisOptions = {
-  host: process.env.REDIS_HOST ?? 'localhost',
-  port: Number(process.env.REDIS_PORT ?? 6379),
+export function getBullRedisConnection(): RedisOptions {
+  if (process.env.REDIS_URL) {
+    const url = new URL(process.env.REDIS_URL);
 
-  // BullMQ recommended: tránh lỗi retry-per-request khi Redis lag
-  maxRetriesPerRequest: null,
-};
+    return {
+      host: url.hostname,
+      port: Number(url.port),
+      username: url.username || undefined,
+      password: url.password || undefined,
+      maxRetriesPerRequest: null,
+      tls: url.protocol === 'rediss:' ? {} : undefined,
+    };
+  }
+
+  return {
+    host: process.env.REDIS_HOST ?? 'localhost',
+    port: Number(process.env.REDIS_PORT ?? 6379),
+    maxRetriesPerRequest: null,
+  };
+}

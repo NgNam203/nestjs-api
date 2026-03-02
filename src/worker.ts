@@ -4,7 +4,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import 'dotenv/config';
 import { Worker } from 'bullmq';
-import { bullRedisConnection } from './infra/queue/redis.connection';
+import { getBullRedisConnection } from './infra/queue/redis.connection';
 import { EMAIL_QUEUE_NAME } from './infra/queue/queues';
 import { PrismaClient } from '@prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
@@ -137,7 +137,7 @@ const worker = new Worker(
       }),
     );
   },
-  { connection: bullRedisConnection, concurrency: 1 },
+  { connection: getBullRedisConnection(), concurrency: 1 },
 );
 
 worker.on('error', (err) => {
