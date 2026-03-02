@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
 import * as Joi from 'joi';
 
 export const envValidationSchema = Joi.object({
@@ -9,6 +6,12 @@ export const envValidationSchema = Joi.object({
   PORT: Joi.number().default(3000),
 
   DATABASE_URL: Joi.string().required(), // dùng cho Prisma
+
+  REDIS_URL: Joi.when('APP_ENV', {
+    is: 'prod',
+    then: Joi.string().required(), // prod bắt buộc có redis thật
+    otherwise: Joi.string().default('redis://localhost:6379'),
+  }),
 
   JWT_ACCESS_SECRET: Joi.when('APP_ENV', {
     is: 'prod',
