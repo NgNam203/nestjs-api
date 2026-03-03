@@ -18,6 +18,8 @@ import { hashToken } from './token-hash';
 import type { RefreshPayload } from './auth.types';
 import ms, { StringValue } from 'ms';
 import { maskEmail } from '../common/utils/mask';
+import { AppError } from '../common/errors/app-error';
+import { appLogger } from '../logger/app-logger';
 
 @Injectable()
 export class AuthService {
@@ -250,11 +252,11 @@ export class AuthService {
 
     // Không phân biệt: user không tồn tại vs sai password vs disabled
     if (!user || !passwordOk || user.status === 'DISABLED') {
-      this.logger.warn(`SECURITY login_fail email=${maskEmail(email)} `);
-      throw new UnauthorizedException({
-        errorCode: 'INVALID_CREDENTIALS',
-        message: 'Invalid email or password',
-      });
+      appLogger.warn({ email: maskEmail(email) }, 'SECURITY login_fail');
+      throw new AppError(
+        'AUTH_INVALID_CREDENTIALS',
+        'Invalid email or password',
+      );
     }
     const sid = randomUUID();
 
@@ -293,8 +295,9 @@ export class AuthService {
       await redis.sadd(`user_sessions:${user.id}`, sid);
     } catch (err) {
       // degrade: không có refresh session
-      this.logger.warn(
-        `SECURITY login_degraded reason=redis_error userId=${user.id}`,
+      appLogger.warn(
+        { userId: user.id },
+        'SECURITY login_degraded redis_error',
       );
       refreshToken = null;
     }
