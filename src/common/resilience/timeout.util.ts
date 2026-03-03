@@ -1,6 +1,3 @@
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
-}
 export class TimeoutError extends Error {
   public readonly label?: string;
 
