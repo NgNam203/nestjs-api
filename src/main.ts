@@ -6,21 +6,20 @@ import { ConfigService } from '@nestjs/config';
 import { LatencyInterceptor } from './interceptors/latency.interceptor';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { NestExpressApplication } from '@nestjs/platform-express';
-import { Logger } from '@nestjs/common';
+import { AppLogger } from './logger/app-logger.service';
 
 async function bootstrap() {
   const isProd = process.env.APP_ENV === 'prod';
 
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    // Prod: giảm ồn. Dev: log thoải mái để debug.
-    logger: isProd
-      ? ['log', 'warn', 'error']
-      : ['debug', 'log', 'warn', 'error', 'verbose'],
+    bufferLogs: true, // quan trọng: để log lúc bootstrap không bị mất
   });
+
+  app.useLogger(app.get(AppLogger));
 
   // Đừng spam console ở prod
   if (!isProd) {
-    console.log('DB_MODE =', process.env.DB_MODE);
+    app.get(AppLogger).debug({ DB_MODE: process.env.DB_MODE }, 'Bootstrap env');
   }
 
   app.set('trust proxy', 1);
@@ -41,9 +40,9 @@ async function bootstrap() {
   app.useGlobalFilters(new AllExceptionsFilter());
 
   await app.listen(port);
-  const logger = new Logger('Bootstrap');
-  // Optional: log 1 dòng confirm (prod vẫn ok)
-  logger.log(`listening on port ${port} env=${process.env.APP_ENV}`);
+  app
+    .get(AppLogger)
+    .log(`listening on port ${port} env=${process.env.APP_ENV}`, 'Bootstrap');
 }
 
 bootstrap();

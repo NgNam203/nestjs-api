@@ -11,6 +11,7 @@ import { AdminController } from './admin/admin.controller';
 import { RolesGuard } from './auth/roles.guard';
 import { OrdersModule } from './orders/orders.module';
 import { IncidentController } from './common/resilience/incident.controller';
+import { AppLogger } from './logger/app-logger.service';
 
 @Module({
   imports: [
@@ -30,7 +31,7 @@ import { IncidentController } from './common/resilience/incident.controller';
     UsersController,
     IncidentController,
   ],
-  providers: [RolesGuard, AppService],
+  providers: [RolesGuard, AppService, AppLogger],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {
