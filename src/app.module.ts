@@ -12,6 +12,9 @@ import { RolesGuard } from './auth/roles.guard';
 import { OrdersModule } from './orders/orders.module';
 import { IncidentController } from './common/resilience/incident.controller';
 import { AppLogger } from './logger/app-logger.service';
+import { MetricsModule } from './metrics/metrics.module';
+import { HealthController } from './health/health.controller';
+import { RedisModule } from './redis/redis.module';
 
 @Module({
   imports: [
@@ -22,14 +25,17 @@ import { AppLogger } from './logger/app-logger.service';
       validationSchema: envValidationSchema,
     }),
     PrismaModule,
+    RedisModule,
     AuthModule,
     OrdersModule,
+    MetricsModule,
   ],
   controllers: [
     AppController,
     AdminController,
     UsersController,
     IncidentController,
+    HealthController,
   ],
   providers: [RolesGuard, AppService, AppLogger],
 })

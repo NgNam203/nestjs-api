@@ -9,8 +9,8 @@ export class AppController {
   getHello(): string {
     return this.appService.getHello();
   }
-  @Get('/health')
-  getHealth() {
-    return { status: 'ok' };
+  @Get('/boom')
+  boom() {
+    throw new Error('boom');
   }
 }
