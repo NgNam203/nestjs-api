@@ -16,15 +16,6 @@ const adapter = new PrismaPg({
 const prisma = new PrismaClient({ adapter });
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-const withTimeout = async <T>(fn: () => Promise<T>, ms: number): Promise<T> => {
-  return Promise.race<T>([
-    fn(),
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(`JOB_TIMEOUT_${ms}MS`)), ms),
-    ),
-  ]);
-};
-
 const worker = new Worker(
   EMAIL_QUEUE_NAME,
   async (job) => {

@@ -1,0 +1,5 @@
+- worker.ts uses console-based structured logs instead of shared app logger
+- removed unused helper `withTimeout` from worker.ts
+- cleanup-job-executions.ts uses console logging intentionally because it is a one-off script
+- moved orders list availability checks out of controller into OrdersAvailabilityGuard
+- orders.service.ts is still too large and mixes pagination, caching, idempotency, queueing, and domain flow; keep as known debt for now
