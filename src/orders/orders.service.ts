@@ -255,7 +255,7 @@ export class OrdersService {
             createdAt: true,
           },
         }),
-        ResilienceConfig.db.timeoutMs,
+        3000,
         'db_timeout_list_orders_cursor',
       );
 
@@ -875,6 +875,26 @@ export class OrdersService {
     q: ListOrdersQueryDto,
     requestId?: string,
   ) {
+    const noCache =
+      (q as any).noCache === true ||
+      (q as any).noCache === '1' ||
+      (q as any).noCache === 'true';
+
+    if (noCache) {
+      if (process.env.NODE_ENV === 'production') {
+        this.logger.warn(`cache_bypass_blocked_in_prod`);
+        throw new BadRequestException({
+          errorCode: 'CACHE_BYPASS_DISABLED',
+          message: 'cache bypass disabled in production',
+        });
+      }
+
+      this.logger.warn(`
+        cache_event event=cache_bypass requestId=${requestId ?? 'none'} keyPrefix=orders:v1:user:list userId=${userId}
+      `);
+
+      return this.listOrdersCore(userId, q);
+    }
     if (this.TTL_LIST_SEC <= 0) {
       return this.listOrdersCore(userId, q);
     }

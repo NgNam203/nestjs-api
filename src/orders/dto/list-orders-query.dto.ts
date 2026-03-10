@@ -1,5 +1,13 @@
 import { Transform } from 'class-transformer';
-import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import {
+  IsBooleanString,
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsString,
+  Max,
+  Min,
+} from 'class-validator';
 import { OrderStatus } from '@prisma/client';
 
 export enum SortBy {
@@ -50,4 +58,8 @@ export class ListOrdersQueryDto {
   @IsOptional()
   @IsEnum(SortOrder)
   sortOrder?: SortOrder = SortOrder.desc;
+
+  @IsOptional()
+  @IsBooleanString()
+  noCache?: string;
 }

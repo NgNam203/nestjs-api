@@ -11,7 +11,6 @@ import {
   Patch,
   Delete,
   Req,
-  ServiceUnavailableException,
 } from '@nestjs/common';
 import { OrdersService } from './orders.service';
 import { CreateOrderDto } from './dto/create-order.dto';
@@ -24,8 +23,7 @@ import { ListOrdersQueryDto } from './dto/list-orders-query.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import type { Request } from 'express';
 import { RateLimitGuard } from '../rate-limit/rate-limit.guard';
-import { DegradeConfig } from '../common/resilience/degrade.config';
-import { ShedConfig } from '../common/resilience/shed.config';
+import { OrdersAvailabilityGuard } from './orders-availability.guard';
 
 @Controller('orders')
 @UseGuards(JwtAuthGuard)
@@ -42,24 +40,13 @@ export class OrdersController {
     return this.orders.createOrderIdempotent(user.userId, dto, idempotencyKey);
   }
 
+  @UseGuards(OrdersAvailabilityGuard)
   @Get()
   list(
     @Req() req: Request,
     @CurrentUser() user: CurrentUserData,
     @Query() q: ListOrdersQueryDto,
   ) {
-    if (DegradeConfig.disableOrdersList) {
-      throw new ServiceUnavailableException({
-        errorCode: 'DEGRADED',
-        message: 'Service temporarily unavailable',
-      });
-    }
-    if (ShedConfig.shedOrdersList) {
-      throw new ServiceUnavailableException({
-        errorCode: 'LOAD_SHED',
-        message: 'Service temporarily unavailable',
-      });
-    }
     const requestId = (req as any).requestId as string | undefined;
     return this.orders.listOrdersCached(user.userId, q, requestId);
   }
