@@ -21,7 +21,7 @@ Health Check
 GET https://nestjs-api-80n7.onrender.com/health
 
 Swagger Docs
-Not enabled in the public demo environment
+https://nestjs-api-80n7.onrender.com/docs
 
 ## Tech Stack
 
@@ -39,6 +39,7 @@ Not enabled in the public demo environment
 
 The system follows a simple service + worker architecture.
 
+```text
 Client
    │
    ▼
@@ -53,6 +54,7 @@ NestJS API
    │
    └── Worker Process
          └── background jobs (email notifications)
+```
 
 ### Components
 
@@ -184,11 +186,24 @@ This prevents worker overload from cascading into API latency.
 Clone the repository:
 
 ```bash
-git clone <repo-url>
-cd auth_service
+git clone https://github.com/NgNam203/nestjs-api.git
+cd nestjs-api
+```
 
+Start dependencies:
+
+```bash
 docker compose up -d
+```
 
+Install dependencies:
+
+```bash
 npm install
+```
 
+Run development server:
+
+```bash
 npm run start:dev
+```

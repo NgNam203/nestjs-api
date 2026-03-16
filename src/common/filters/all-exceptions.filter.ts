@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-enum-comparison */
 import {
   ArgumentsHost,
   Catch,
@@ -6,7 +7,7 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
-import { logger } from '../../logger/logger'; // tùy path bạn đang đặt
+import { logger } from '../../logger/logger';
 import { TimeoutError } from '../resilience/timeout.util';
 import { AppError } from '../errors/app-error';
 
@@ -18,6 +19,29 @@ function safeMsg(x: unknown): string {
   if (x && typeof x === 'object' && 'message' in x)
     return String((x as { message?: unknown }).message);
   return 'Unknown error';
+}
+
+function defaultHttpErrorCode(statusCode: number): string {
+  switch (statusCode) {
+    case HttpStatus.BAD_REQUEST:
+      return 'BAD_REQUEST';
+    case HttpStatus.UNAUTHORIZED:
+      return 'UNAUTHORIZED';
+    case HttpStatus.FORBIDDEN:
+      return 'FORBIDDEN';
+    case HttpStatus.NOT_FOUND:
+      return 'NOT_FOUND';
+    case HttpStatus.CONFLICT:
+      return 'CONFLICT';
+    case HttpStatus.UNPROCESSABLE_ENTITY:
+      return 'VALIDATION_ERROR';
+    case HttpStatus.TOO_MANY_REQUESTS:
+      return 'RATE_LIMITED';
+    case HttpStatus.SERVICE_UNAVAILABLE:
+      return 'SERVICE_UNAVAILABLE';
+    default:
+      return statusCode >= 500 ? 'INTERNAL_ERROR' : 'HTTP_ERROR';
+  }
 }
 
 @Catch()
@@ -45,12 +69,17 @@ export class AllExceptionsFilter implements ExceptionFilter {
       ? 'TIMEOUT'
       : isApp
         ? exception.code
-        : 'INTERNAL_ERROR';
+        : isHttp
+          ? defaultHttpErrorCode(statusCode)
+          : 'INTERNAL_ERROR';
+
     let message = isTimeout
       ? 'Service temporarily unavailable'
       : isApp
         ? exception.message
-        : 'Internal server error';
+        : statusCode >= 500
+          ? 'Internal server error'
+          : 'Request failed';
 
     if (isHttp) {
       const response = exception.getResponse();
@@ -77,7 +106,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
       path: req.originalUrl ?? req.url,
       statusCode,
       errorCode,
-      // pino sẽ serialize error object tốt nếu bạn đưa thẳng vào field `err`
       err: exception,
     };
 

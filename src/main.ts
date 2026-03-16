@@ -7,6 +7,7 @@ import { LatencyInterceptor } from './interceptors/latency.interceptor';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppLogger } from './logger/app-logger.service';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 
 async function bootstrap() {
   const isProd = process.env.APP_ENV === 'prod';
@@ -38,6 +39,15 @@ async function bootstrap() {
 
   app.useGlobalInterceptors(new LatencyInterceptor());
   app.useGlobalFilters(new AllExceptionsFilter());
+
+  const config = new DocumentBuilder()
+    .setTitle('NestJS API')
+    .setDescription('Backend API documentation')
+    .setVersion('1.0')
+    .build();
+
+  const document = SwaggerModule.createDocument(app, config);
+  SwaggerModule.setup('docs', app, document);
 
   await app.listen(port);
   app

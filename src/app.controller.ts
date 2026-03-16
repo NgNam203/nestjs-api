@@ -1,4 +1,4 @@
-import { Controller, Get } from '@nestjs/common';
+import { Controller, Get, HttpCode } from '@nestjs/common';
 import { AppService } from './app.service';
 
 @Controller()
@@ -12,5 +12,11 @@ export class AppController {
   @Get('/boom')
   boom() {
     throw new Error('boom');
+  }
+
+  @Get('favicon.ico')
+  @HttpCode(204)
+  favicon() {
+    return;
   }
 }
