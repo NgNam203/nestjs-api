@@ -10,7 +10,6 @@ export class RedisService implements OnModuleDestroy {
   constructor(private readonly config: ConfigService) {
     const url =
       this.config.get<string>('REDIS_URL') ?? 'redis://localhost:6379';
-    this.logger.log(`redis_url ${url}`);
     this.client = new Redis(url, {
       // quan trọng: fail nhanh khi Redis down
       connectTimeout: 300,
