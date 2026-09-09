@@ -11,8 +11,7 @@ import { runtimeState } from './runtime-state';
 export class IncidentController {
   private auth(secret?: string) {
     const expected = process.env.INCIDENT_SECRET;
-    if (!expected) return; // allow if not set (dev only)
-    if (secret !== expected)
+    if (!expected || secret !== expected)
       throw new ForbiddenException({ errorCode: 'FORBIDDEN' });
   }
 
