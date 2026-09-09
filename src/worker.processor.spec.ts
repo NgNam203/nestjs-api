@@ -2,6 +2,17 @@ import { JobExecution, Prisma, PrismaClient } from '@prisma/client';
 import { DelayedError } from 'bullmq';
 import { createEmailProcessor } from './worker.processor';
 
+type ReservationWhere = Pick<
+  JobExecution,
+  'id' | 'idempotencyKey' | 'status'
+> & {
+  lockedAt?: { equals: Date; lt: Date };
+};
+type Execute = Parameters<typeof createEmailProcessor>[1];
+type CreateArgs = { data: Omit<JobExecution, 'createdAt' | 'updatedAt'> };
+type UpdateArgs = { where: ReservationWhere; data: Partial<JobExecution> };
+type DeleteArgs = { where: ReservationWhere };
+
 const conflict = () =>
   new Prisma.PrismaClientKnownRequestError('duplicate', {
     code: 'P2002',
@@ -11,17 +22,19 @@ const conflict = () =>
 describe('worker domain reservations', () => {
   let row: JobExecution | null;
   let db: {
-    create: jest.Mock;
-    findUnique: jest.Mock;
-    updateMany: jest.Mock;
-    deleteMany: jest.Mock;
+    create: jest.Mock<Promise<JobExecution>, [CreateArgs]>;
+    findUnique: jest.Mock<Promise<JobExecution | null>, []>;
+    updateMany: jest.Mock<Promise<Prisma.BatchPayload>, [UpdateArgs]>;
+    deleteMany: jest.Mock<Promise<Prisma.BatchPayload>, [DeleteArgs]>;
   };
   const job = () => ({
     id: 'job',
     name: 'send_order_email',
     attemptsMade: 0,
     data: { idempotencyKey: 'email:order_confirm:1', orderId: '1' },
-    moveToDelayed: jest.fn().mockResolvedValue(undefined),
+    moveToDelayed: jest
+      .fn<Promise<void>, [number, string?]>()
+      .mockResolvedValue(undefined),
   });
   const seed = (status: 'PROCESSING' | 'COMPLETED', age = 0) => {
     row = {
@@ -35,7 +48,7 @@ describe('worker domain reservations', () => {
       updatedAt: new Date(),
     };
   };
-  const matches = (where: any) =>
+  const matches = (where: ReservationWhere) =>
     row &&
     row.id === where.id &&
     row.idempotencyKey === where.idempotencyKey &&
@@ -43,7 +56,11 @@ describe('worker domain reservations', () => {
     (!where.lockedAt ||
       (row.lockedAt.getTime() === where.lockedAt.equals.getTime() &&
         row.lockedAt < where.lockedAt.lt));
-  const processor = (execute = jest.fn().mockResolvedValue(undefined)) =>
+  const processor = (
+    execute: Execute = jest
+      .fn<ReturnType<Execute>, Parameters<Execute>>()
+      .mockResolvedValue(undefined),
+  ) =>
     createEmailProcessor(
       { jobExecution: db } as unknown as Pick<PrismaClient, 'jobExecution'>,
       execute,
@@ -53,21 +70,21 @@ describe('worker domain reservations', () => {
     row = null;
     jest.spyOn(console, 'log').mockImplementation();
     db = {
-      create: jest.fn(async ({ data }) => {
-        if (row) throw conflict();
+      create: jest.fn(({ data }: CreateArgs) => {
+        if (row) return Promise.reject(conflict());
         row = { ...data, createdAt: new Date(), updatedAt: new Date() };
-        return row;
+        return Promise.resolve(row);
       }),
-      findUnique: jest.fn(async () => (row ? { ...row } : null)),
-      updateMany: jest.fn(async ({ where, data }) => {
-        if (!matches(where)) return { count: 0 };
+      findUnique: jest.fn(() => Promise.resolve(row ? { ...row } : null)),
+      updateMany: jest.fn(({ where, data }: UpdateArgs) => {
+        if (!matches(where)) return Promise.resolve({ count: 0 });
         row = { ...row!, ...data };
-        return { count: 1 };
+        return Promise.resolve({ count: 1 });
       }),
-      deleteMany: jest.fn(async ({ where }) => {
-        if (!matches(where)) return { count: 0 };
+      deleteMany: jest.fn(({ where }: DeleteArgs) => {
+        if (!matches(where)) return Promise.resolve({ count: 0 });
         row = null;
-        return { count: 1 };
+        return Promise.resolve({ count: 1 });
       }),
     };
   });
@@ -76,7 +93,7 @@ describe('worker domain reservations', () => {
   it('releases a failed attempt and lets its retry complete', async () => {
     const error = new Error('execution failed');
     const execute = jest
-      .fn()
+      .fn<ReturnType<Execute>, Parameters<Execute>>()
       .mockRejectedValueOnce(error)
       .mockResolvedValueOnce(undefined);
     const run = processor(execute);
@@ -90,7 +107,7 @@ describe('worker domain reservations', () => {
   it('defers fresh PROCESSING using the BullMQ control error', async () => {
     seed('PROCESSING');
     const current = job();
-    const execute = jest.fn();
+    const execute = jest.fn<ReturnType<Execute>, Parameters<Execute>>();
     await expect(processor(execute)(current, 'token')).rejects.toBeInstanceOf(
       DelayedError,
     );
@@ -106,7 +123,7 @@ describe('worker domain reservations', () => {
 
   it('skips a COMPLETED duplicate safely', async () => {
     seed('COMPLETED');
-    const execute = jest.fn();
+    const execute = jest.fn<ReturnType<Execute>, Parameters<Execute>>();
     await expect(processor(execute)(job(), 'token')).resolves.toBeUndefined();
     expect(execute).not.toHaveBeenCalled();
     expect(db.updateMany).not.toHaveBeenCalled();
@@ -124,7 +141,9 @@ describe('worker domain reservations', () => {
 
   it('allows only one concurrent stale takeover owner', async () => {
     seed('PROCESSING', 121000);
-    const execute = jest.fn().mockResolvedValue(undefined);
+    const execute = jest
+      .fn<ReturnType<Execute>, Parameters<Execute>>()
+      .mockResolvedValue(undefined);
     const run = processor(execute);
     const results = await Promise.allSettled([
       run(job(), 'a'),
@@ -132,7 +151,7 @@ describe('worker domain reservations', () => {
     ]);
     expect(results.filter((r) => r.status === 'fulfilled')).toHaveLength(1);
     expect(results.find((r) => r.status === 'rejected')).toMatchObject({
-      reason: expect.any(DelayedError),
+      reason: expect.any(DelayedError) as unknown,
     });
     expect(execute).toHaveBeenCalledTimes(1);
     expect(row!.status).toBe('COMPLETED');
@@ -141,8 +160,9 @@ describe('worker domain reservations', () => {
 
   it('prevents an old owner completing or releasing a newer reservation', async () => {
     const run = processor(
-      jest.fn(async () => {
+      jest.fn(() => {
         row = { ...row!, id: 'new-owner' };
+        return Promise.resolve();
       }),
     );
     await expect(run(job(), 'token')).rejects.toThrow('ownership lost');
