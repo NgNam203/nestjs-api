@@ -96,7 +96,7 @@ NestJS API
 1. API enqueues a job into Redis using BullMQ
 2. Worker process listens to the queue
 3. Worker consumes the job
-4. Worker performs the background task (e.g. sending email notification)
+4. Worker simulates email sending with an 8-second delay; no real email is delivered
 5. Job result is logged and the job is removed after completion
 
 ### Cache Strategy
@@ -176,6 +176,8 @@ This prevents worker overload from cascading into API latency.
 
 ## Current Limitations
 
+- Email sending is simulation only; no email provider or real delivery is configured.
+- `/health` can return HTTP 200 while its response body reports `degraded` (one dependency down) or `unhealthy` (both PostgreSQL and Redis down). Inspect the response body; the Docker HTTP healthcheck alone does not guarantee healthy dependencies.
 - Observability is still basic and does not include distributed tracing.
 - Load testing has only been performed at a limited scale.
 - The OrdersService module is relatively large and could be further decomposed.
@@ -190,20 +192,23 @@ git clone https://github.com/NgNam203/nestjs-api.git
 cd nestjs-api
 ```
 
-Start dependencies:
+Prerequisites: Docker with Docker Compose and an available host port 3000.
+
+Build and start PostgreSQL, Redis, the API, and the worker:
 
 ```bash
-docker compose up -d
+docker compose up --build -d
 ```
 
-Install dependencies:
+The API runs `prisma migrate deploy` before starting NestJS. If migrations fail, the API does not start. The worker starts after the API healthcheck passes and runs `npm run worker:prod` without an HTTP port.
+
+API: http://localhost:3000 — Swagger: http://localhost:3000/docs — Health: http://localhost:3000/health
+
+All services run in Compose; no local npm install or local API process is required. PostgreSQL and Redis are accessible within the Compose network only.
+
+Check startup:
 
 ```bash
-npm install
-```
-
-Run development server:
-
-```bash
-npm run start:dev
+docker compose ps
+docker compose logs api worker
 ```
